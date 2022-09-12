@@ -1,0 +1,9 @@
+/venv
+postgres_data
+*.log
+*.pot
+*.pyc
+__pycache__
+/.idea
+.env
+.dockerignore

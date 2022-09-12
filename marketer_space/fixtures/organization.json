@@ -1,0 +1,10 @@
+[
+  {
+    "model": "accounts.Organization",
+    "pk": 1,
+    "fields": {
+      "domain": "marketer.space.com",
+      "name": "Marketer Space LLC"
+    }
+  }
+]

@@ -1,0 +1,24 @@
+version: '3.7'
+
+services:
+  postgres:
+    image: postgres:12
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+  market_space:
+    build:
+      context: ./
+      dockerfile: marketer_space/Dockerfile
+    env_file:
+      - .env
+    command: python marketer_space/marketer_space/manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app/marketer_space
+    ports:
+      - 8000:8000
+    depends_on:
+      - postgres
+volumes:
+  pg-data:
