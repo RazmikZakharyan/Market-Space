@@ -4,21 +4,35 @@ services:
   postgres:
     image: postgres:12
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data/
+      - "postgres_data:/var/lib/postgresql/data/"
     env_file:
       - .env
   market_space:
-    build:
-      context: ./
-      dockerfile: marketer_space/Dockerfile
+    build: .
     env_file:
       - .env
-    command: python marketer_space/marketer_space/manage.py runserver 0.0.0.0:8000
-    volumes:
-      - .:/app/marketer_space
+    command: ['sh', '.././start.sh']
     ports:
-      - 8000:8000
+      - "8000:8000"
     depends_on:
       - postgres
+  rabbit:
+    hostname: rabbit
+    image: rabbitmq:3-management
+    env_file:
+      - .env
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+  worker:
+    build: .
+    env_file:
+      - .env
+    command: ['celery', '-A', 'celery', 'worker']
+    links:
+      - rabbit
+    depends_on:
+      - market_space
+      - rabbit
 volumes:
-  pg-data:
+  postgres_data:

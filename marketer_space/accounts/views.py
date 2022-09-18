@@ -5,8 +5,6 @@ from rest_framework.generics import (
 )
 from rest_framework.response import Response
 
-from django.db import transaction
-
 from .permissions import (
     IsUser,
     OrganizationAdminHasPermission,
@@ -15,7 +13,7 @@ from .permissions import (
     InviteTokenPermission
 )
 from .models import InviteToken
-from .utils import send_mail
+from .tasks import send_email
 from .serializers import (
     OrganizationSerializers, InviteUserSerializers, UserCreateSerializers
 )
@@ -76,7 +74,6 @@ class InviteUserApiView(CreateAPIView, TokenMixin):
     serializer_class = InviteUserSerializers
     permission_classes = [IsSuperAdmin | OrganizationAdminHasPermission]
 
-    @transaction.atomic
     def create(self, request, *args, **kwargs):
         data = request.data.to_dict()
         data['inviter_role'] = self.request.user.role
@@ -92,8 +89,7 @@ class InviteUserApiView(CreateAPIView, TokenMixin):
             self.request.user.last_name
         )
 
-        sid = transaction.savepoint()
-        response = send_mail(
+        send_email.delay(
             subject,
             message.format(
                 serializer.data['first_name'],
@@ -107,9 +103,6 @@ class InviteUserApiView(CreateAPIView, TokenMixin):
             EMAIL_HOST_USER,
             [serializer.data.get('email')]
         )
-        if response is not None:
-            transaction.savepoint_rollback(sid)
-            return response
 
         return Response(serializer.data, status=status.HTTP_201_CREATED,
                         headers=headers)

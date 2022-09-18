@@ -3,9 +3,11 @@ import smtplib
 from django.core.mail import send_mail
 from rest_framework import status
 from rest_framework.response import Response
+from celery import shared_task
 
 
-def send_mail(subject, message, from_email, recipient_list):
+@shared_task()
+def send_email(subject, message, from_email, recipient_list):
     try:
         send_mail(
             subject=subject,

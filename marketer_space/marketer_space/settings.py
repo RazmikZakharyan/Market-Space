@@ -11,7 +11,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost']
 
 # Application definition
 
@@ -165,3 +165,14 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.Account'
+
+RABBITMQ = {
+    "PROTOCOL": "amqp",
+    "HOST": os.environ.get("RABBITMQ_HOST", "rabbit"),
+    "PORT": os.environ.get("RABBITMQ_PORT", 5672),
+    "USER": os.environ.get("RABBITMQ_DEFAULT_USER"),
+    "PASSWORD":  os.environ.get("RABBITMQ_DEFAULT_PASS"),
+}
+
+CELERY_BROKER_URL = f'amqp://{RABBITMQ["USER"]}:{RABBITMQ["PASSWORD"]}@{RABBITMQ["HOST"]}:5672//'
+CELERY_RESULT_BACKEND = "rabbit"
