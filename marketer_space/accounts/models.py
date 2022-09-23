@@ -40,29 +40,6 @@ class Organization(models.Model):
     name = models.CharField(max_length=128)
 
 
-class Campaign(models.Model):
-    STATUSES = (
-        'not_started', 'started', 'paused', 'completed'
-    )
 
-    uploaded_files = models.ManyToManyField('UploadedFile')
-    goal = models.TextField()
-    scheduled_time = models.DateTimeField()
-    status = models.CharField(choices=STATUSES)
-
-
-class UploadedFile(models.Model):
-    CSV_file = models.FileField(upload_to='uploaded_files/%Y/%m')
-    uploaded_at = models.DateTimeField(auto_now=True)
-    uploaded_by = models.ForeignKey(Account, on_delete=models.CASCADE)
-
-
-class Contact(models.Model):
-    first_name = models.CharField(max_length=128)
-    last_name = models.CharField(max_length=128)
-    email = models.EmailField()
-    company_name = models.CharField(max_length=256)
-    job_title = models.CharField(max_length=256)
-    contact_list = models.ForeignKey(UploadedFile, on_delete=models.CASCADE)
 
 
