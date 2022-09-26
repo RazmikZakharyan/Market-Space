@@ -8,7 +8,6 @@ services:
     env_file:
       - .env
   market_space:
-    build: .
     env_file:
       - .env
     command: ['sh', '.././start.sh']

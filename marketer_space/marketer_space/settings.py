@@ -27,7 +27,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
 
     'accounts',
-    'campaign',
+    'campaigns',
 ]
 
 MIDDLEWARE = [
@@ -85,7 +85,6 @@ DATABASES = {
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication'
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -166,6 +165,8 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.Account'
+
+MAX_UPLOAD_SIZE = 2097152
 
 RABBITMQ = {
     "PROTOCOL": "amqp",
