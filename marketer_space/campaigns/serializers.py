@@ -2,7 +2,7 @@ import os
 
 from rest_framework import serializers
 
-from .models import Campaign, CampaignTemplate, UploadedFile
+from .models import Campaign, CampaignTemplate, UploadedFile, Contact
 
 
 class CampaignCreateSerializers(serializers.ModelSerializer):
@@ -60,6 +60,12 @@ class CampaignUpdateSerializers(serializers.ModelSerializer):
         ):
             if self.instance.status == 'not_started':
                 raise serializers.ValidationError("Status not valid.")
+        if attrs.get('status') == 'started':
+            if (not self.instance.campaign_template and
+                    not attrs.get('campaign_template')):
+                raise serializers.ValidationError(
+                    "campaign_template is require when status is starting"
+                )
 
         return attrs
 
@@ -78,7 +84,9 @@ class CampaignTemplateCreateSerializers(serializers.ModelSerializer):
         if not Campaign.objects.filter(
                 id=attrs.get('campaign_id'), created_by=attrs.get('created_by')
         ).exists():
-            raise serializers.ValidationError("Campaign not found.")
+            raise serializers.ValidationError(
+                {'campaign_id': "Campaign not found."},
+            )
 
         return attrs
 
@@ -126,7 +134,9 @@ class UploadedFileSerializers(serializers.ModelSerializer):
                 id=attrs.get('campaign_id'),
                 created_by=attrs.get('uploaded_by')
         ).exists():
-            raise serializers.ValidationError("Campaign not found.")
+            raise serializers.ValidationError(
+                {'campaign_id': "Campaign not found."}
+            )
 
         extension = os.path.splitext(
             attrs.get('CSV_file').name
@@ -147,3 +157,9 @@ class UploadedFileSerializers(serializers.ModelSerializer):
         campaign.save()
 
         return uploaded_file
+
+
+class ContactSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = Contact
+        fields = '__all__'

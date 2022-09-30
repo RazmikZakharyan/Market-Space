@@ -8,6 +8,7 @@ services:
     env_file:
       - .env
   market_space:
+    build: .
     env_file:
       - .env
     command: ['sh', '.././start.sh']
@@ -27,11 +28,20 @@ services:
     build: .
     env_file:
       - .env
-    command: ['celery', '-A', 'marketer_space.celery', 'worker']
+    command: ['celery', '-A', 'marketer_space.celery', 'worker', '-l', 'info']
     links:
       - rabbit
     depends_on:
       - market_space
+      - rabbit
+  celery-beat:
+    build: .
+    command: ['celery', '-A', 'marketer_space.celery', 'beat', '-l', 'info']
+    volumes:
+      - ./project/:/usr/src/app/
+    env_file:
+      - .env
+    depends_on:
       - rabbit
 volumes:
   postgres_data:

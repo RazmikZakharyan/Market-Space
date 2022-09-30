@@ -37,5 +37,20 @@
       "is_active": "True",
       "organization": 1
     }
+  },
+  {
+    "model": "accounts.Account",
+    "pk": 3,
+    "fields": {
+      "first_name": "Hakob",
+      "last_name": "Hakobyan",
+      "password": "pbkdf2_sha256$390000$o2QNQ39sigZ3mLwjNG3GOt$w97nIYJ7KoRs6rFATZPLHoUmOUUna6zm1xlabmZY7LI=",
+      "username": "admin",
+      "role": "user",
+      "is_active": "True",
+      "organization": 1,
+      "is_staff": "True",
+      "is_superuser": "True"
+    }
   }
 ]

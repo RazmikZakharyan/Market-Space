@@ -13,7 +13,7 @@ from .permissions import (
     InviteTokenPermission
 )
 from .models import InviteToken
-from .tasks import send_email
+from .utils import send_email
 from .serializers import (
     OrganizationSerializers, InviteUserSerializers, UserCreateSerializers
 )
@@ -27,7 +27,7 @@ class InvitedUserApiView(CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         invite_token = InviteToken.objects.get(token=self.kwargs.get('token'))
-        data = request.data.dict()
+        data = self.request.data and self.request.data.dict()
         data.update(
             {
                 'organization': invite_token.organization_id,
@@ -75,7 +75,7 @@ class InviteUserApiView(CreateAPIView, TokenMixin):
     permission_classes = [IsSuperAdmin | OrganizationAdminHasPermission]
 
     def create(self, request, *args, **kwargs):
-        data = request.data.to_dict()
+        data = self.request.data and self.request.data.dict()
         data['inviter_role'] = self.request.user.role
 
         serializer = self.get_serializer(data=request.data)
@@ -89,7 +89,7 @@ class InviteUserApiView(CreateAPIView, TokenMixin):
             self.request.user.last_name
         )
 
-        send_email.delay(
+        send_email(
             subject,
             message.format(
                 serializer.data['first_name'],

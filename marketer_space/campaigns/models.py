@@ -37,7 +37,7 @@ class UploadedFile(models.Model):
 class Contact(models.Model):
     first_name = models.CharField(max_length=128)
     last_name = models.CharField(max_length=128)
-    email = models.EmailField()
+    mail = models.EmailField()
     company_name = models.CharField(max_length=256)
     job_title = models.CharField(max_length=256)
     contact_list = models.ForeignKey(UploadedFile, on_delete=models.CASCADE)

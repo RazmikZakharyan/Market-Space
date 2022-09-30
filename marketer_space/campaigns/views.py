@@ -12,6 +12,7 @@ from .serializers import (
     UploadedFileSerializers
 )
 from .models import Campaign, CampaignTemplate, UploadedFile
+from .mixin import UploadFileMixin
 
 
 class CampaignViewSet(ModelViewSet):
@@ -20,7 +21,7 @@ class CampaignViewSet(ModelViewSet):
     queryset = Campaign.objects.all()
 
     def create(self, request, *args, **kwargs):
-        data = self.request.data.dict()
+        data = self.request.data and self.request.data.dict()
         data['created_by'] = self.request.user.id
 
         serializer = self.get_serializer(data=data)
@@ -40,7 +41,7 @@ class CampaignViewSet(ModelViewSet):
         return Campaign.objects.filter(created_by_id=self.request.user.id)
 
 
-class CampaignTemplateViewSet(ModelViewSet):
+class CampaignTemplateViewSet(CampaignViewSet):
     serializer_class = CampaignTemplateCreateSerializers
     permission_classes = [IsAuthenticated]
     queryset = CampaignTemplate.objects.all()
@@ -55,17 +56,22 @@ class CampaignTemplateViewSet(ModelViewSet):
         )
 
 
-class UploadedFileApiVew(CreateAPIView, DestroyAPIView):
+class UploadedFileApiVew(UploadFileMixin, CreateAPIView, DestroyAPIView):
     serializer_class = UploadedFileSerializers
     permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        data = self.request.data.dict()
+        data = self.request.data and self.request.data.dict()
         data['uploaded_by'] = self.request.user.id
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+        self.create_contact(
+            serializer.instance.CSV_file.path, serializer.instance.id,
+            serializer.instance.uploaded_by.email
+        )
+
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED,
                         headers=headers)
