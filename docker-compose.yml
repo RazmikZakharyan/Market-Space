@@ -14,6 +14,8 @@ services:
     command: ['sh', '.././start.sh']
     ports:
       - "8000:8000"
+    volumes:
+      - './media:/usr/src/app/market_space/media'
     depends_on:
       - postgres
   rabbit:
@@ -31,6 +33,8 @@ services:
     command: ['celery', '-A', 'marketer_space.celery', 'worker', '-l', 'info']
     links:
       - rabbit
+    volumes:
+      - './media:/usr/src/app/market_space/media'
     depends_on:
       - market_space
       - rabbit

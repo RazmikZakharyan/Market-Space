@@ -1,11 +1,33 @@
 import os
+import csv
 
+from marketer_space.settings import EMAIL_HOST_USER
+from accounts.utils import send_mail
+
+from django_fsm import TransitionNotAllowed, FSMField
+from celery import shared_task
 from rest_framework import serializers
+from django.utils import timezone
 
 from .models import Campaign, CampaignTemplate, UploadedFile, Contact
 
 
-class CampaignCreateSerializers(serializers.ModelSerializer):
+class CampaignSerializers(serializers.ModelSerializer):
+    STATUSES = (
+        ('not_start', 'Not Start'),
+        ('start', 'Start'),
+        ('pause', 'Pause'),
+        ('complete', 'Complete')
+    )
+    created_by = serializers.HiddenField(
+        default=serializers.CurrentUserDefault()
+    )
+
+    status = serializers.ChoiceField(
+        default=STATUSES[0][0],
+        choices=STATUSES,
+    )
+
     class Meta:
         model = Campaign
         fields = (
@@ -21,57 +43,40 @@ class CampaignCreateSerializers(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
-        if (
-                attrs.get('status') and
-                attrs.get('status') not in ('not_started', 'started')
-        ):
-            raise serializers.ValidationError(
-                "Status not valid. Choice from list ('not_started', 'started')"
-            )
-        return attrs
-
-
-class CampaignUpdateSerializers(serializers.ModelSerializer):
-    scheduled_time = serializers.DateTimeField(
-        input_formats=['%Y-%m-%d %H:%M']
-    )
-
-    class Meta:
-        model = Campaign
-        fields = (
-            'id',
-            'goal',
-            'campaign_template',
-            'scheduled_time',
-            'status'
-        )
-        extra_kwargs = {
-            "goal": {"required": False, "allow_null": True},
-            "campaign_template": {"required": False, "allow_null": True},
-            "id": {'read_only': True}
-        }
-
-    def validate(self, attrs):
-        if self.instance.status == 'completed':
-            raise serializers.ValidationError("Campaign completed.")
-        if (
-                attrs.get('status') and
-                attrs.get('status') in ('paused', 'completed')
-        ):
-            if self.instance.status == 'not_started':
-                raise serializers.ValidationError("Status not valid.")
-        if attrs.get('status') == 'started':
-            if (not self.instance.campaign_template and
+        if attrs.get('status') == 'start':
+            if (self.instance and not self.instance.campaign_template and
                     not attrs.get('campaign_template')):
                 raise serializers.ValidationError(
                     "campaign_template is require when status is starting"
                 )
-
         return attrs
 
+    def create(self, validated_data):
+        state = validated_data.pop('status')
+        instance = Campaign(**validated_data)
+        self.change_state(instance, state)
 
-class CampaignTemplateCreateSerializers(serializers.ModelSerializer):
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        state = validated_data.pop('status')
+        self.change_state(instance, state)
+        return super().update(instance, validated_data)
+
+    @staticmethod
+    def change_state(instance, new_state):
+        if new_state:
+            try:
+                getattr(instance, new_state)()
+            except TransitionNotAllowed:
+                raise serializers.ValidationError("Invalid transition")
+
+
+class CampaignTemplateSerializers(serializers.ModelSerializer):
     campaign_id = serializers.IntegerField(write_only=True)
+    created_by = serializers.HiddenField(
+        default=serializers.CurrentUserDefault()
+    )
 
     class Meta:
         model = CampaignTemplate
@@ -101,26 +106,12 @@ class CampaignTemplateCreateSerializers(serializers.ModelSerializer):
         return campaign_template
 
 
-class CampaignTemplateUpdateSerializers(serializers.ModelSerializer):
-    class Meta:
-        model = CampaignTemplate
-        fields = ['id', 'subject', 'content', 'campaign_id']
-        extra_kwargs = {
-            "id": {'read_only': True}
-        }
-
-    def validate(self, attrs):
-        if not Campaign.objects.filter(
-                id=attrs.get('campaign_id'),
-                created_by=self.instance.created_by
-        ).exists():
-            raise serializers.ValidationError("Campaign not found.")
-
-        return attrs
-
-
 class UploadedFileSerializers(serializers.ModelSerializer):
+    MAX_UPLOAD_SIZE = 2097152
     campaign_id = serializers.IntegerField(write_only=True)
+    uploaded_by = serializers.HiddenField(
+        default=serializers.CurrentUserDefault()
+    )
 
     class Meta:
         model = UploadedFile
@@ -130,12 +121,37 @@ class UploadedFileSerializers(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
-        if not Campaign.objects.filter(
-                id=attrs.get('campaign_id'),
-                created_by=attrs.get('uploaded_by')
-        ).exists():
+        campaign = Campaign.objects.filter(
+            id=attrs.get('campaign_id'),
+            created_by=attrs.get('uploaded_by')
+        ).first()
+
+        if not campaign:
             raise serializers.ValidationError(
                 {'campaign_id': "Campaign not found."}
+            )
+
+        if campaign.status in ['started', 'completed']:
+            raise serializers.ValidationError(
+                {
+                    'campaign_id': "The campaign is started or completed "
+                                   "you can't upload files"
+                }
+            )
+        if (
+                campaign.status == 'paused' and
+                campaign.scheduled_time < timezone.now()
+        ):
+            raise serializers.ValidationError(
+                {
+                    'campaign_id': "The scheduled time is hit "
+                                   "you can't upload files"
+                }
+            )
+
+        if attrs.get('CSV_file').size > self.MAX_UPLOAD_SIZE:
+            raise serializers.ValidationError(
+                {'CSV_file': 'File size is bigger than 2MB'}
             )
 
         extension = os.path.splitext(
@@ -156,7 +172,46 @@ class UploadedFileSerializers(serializers.ModelSerializer):
         campaign.uploaded_files.add(uploaded_file)
         campaign.save()
 
+        # self.create_contacts.delay(
+        #     uploaded_file.CSV_file.path, uploaded_file.id,
+        #     uploaded_file.uploaded_by.email
+        # )
+        self.create_contacts(
+            uploaded_file.CSV_file.path, uploaded_file.id,
+            uploaded_file.uploaded_by.email
+        )
+
         return uploaded_file
+
+    @staticmethod
+    # @shared_task
+    def create_contacts(csv_path, contact_list, user_email):
+        contacts = csv.DictReader(open(csv_path))
+        content = "created contact data: \n {} \n " \
+                  "not created due to validation: \n {}"
+        errors = []
+        data = []
+        contacts_obj = []
+        for row_id, item in enumerate(contacts):
+            item['contact_list'] = contact_list
+            serializer = ContactSerializers(data=item)
+            if serializer.is_valid():
+                contacts_obj.append(
+                    Contact(**serializer.validated_data)
+                )
+                data.append(serializer.data)
+            else:
+                error = serializer.errors
+                error['row_id'] = row_id
+                errors.append(error)
+
+        Contact.objects.bulk_create(contacts_obj)
+        # send_mail(
+        #     'Marketer Space',
+        #     content.format(data, errors),
+        #     EMAIL_HOST_USER,
+        #     [user_email]
+        # )
 
 
 class ContactSerializers(serializers.ModelSerializer):

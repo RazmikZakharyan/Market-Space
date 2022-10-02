@@ -8,3 +8,6 @@ __pycache__
 .env
 .dockerignore
 src
+/marketer_space/media
+/media
+/project

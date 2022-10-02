@@ -25,6 +25,7 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'rest_framework_simplejwt',
+    'django_fsm',
     'django_celery_results',
     'django_celery_beat',
 
@@ -166,8 +167,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.Account'
-
-MAX_UPLOAD_SIZE = 2097152
 
 RABBITMQ = {
     "PROTOCOL": "amqp",

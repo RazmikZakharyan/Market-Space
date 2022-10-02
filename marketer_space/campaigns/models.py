@@ -1,4 +1,6 @@
 from django.db import models
+from django_fsm import FSMField, transition
+
 from accounts.models import Account
 
 
@@ -17,9 +19,25 @@ class Campaign(models.Model):
     )
     created_by = models.ForeignKey(Account, on_delete=models.CASCADE)
     scheduled_time = models.DateTimeField()
-    status = models.CharField(
-        max_length=12, choices=STATUSES, default='not_started'
-    )
+    status = FSMField(default=STATUSES[0][0], choices=STATUSES, protected=True)
+
+    @transition(field=status, source=['not_started', 'started', 'paused'],
+                target='not_started')
+    def not_start(self):
+        return 'not_started'
+
+    @transition(field=status, source=['not_started', 'paused'],
+                target='started')
+    def start(self):
+        return 'started'
+
+    @transition(field=status, source=['started'], target='paused')
+    def pause(self):
+        return 'pause'
+
+    @transition(field=status, source=['started', 'paused'], target='completed')
+    def complete(self):
+        return 'complete'
 
 
 class CampaignTemplate(models.Model):
@@ -31,7 +49,9 @@ class CampaignTemplate(models.Model):
 class UploadedFile(models.Model):
     CSV_file = models.FileField(upload_to='uploaded_files/%Y/%m')
     uploaded_at = models.DateTimeField(auto_now=True)
-    uploaded_by = models.ForeignKey(Account, on_delete=models.CASCADE)
+    uploaded_by = models.ForeignKey(
+        Account, on_delete=models.SET_NULL, null=True
+    )
 
 
 class Contact(models.Model):
